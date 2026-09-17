@@ -156,7 +156,7 @@ nrow(ag_specific_bcr)
 
 ## Reference database collection
 
-We are continuously expanding the database. `get_reference(context = ...)` currently accepts `SarsCoV2`, `Vaccinia`, `Tetanus`, `Measles`, `Mumps`, `Hpylori` and `NP`, and can be narrowed further with the `org`, `publication` and `epitope` arguments.
+We are continuously expanding the database, which currently holds 103,928 contigs across seven antigen contexts. `get_reference(context = ...)` accepts `SarsCoV2`, `Vaccinia`, `Tetanus`, `Measles`, `Mumps`, `Hpylori` and `NP`, and can be narrowed further with the `org`, `publication` and `epitope` arguments.
 
 | Context | Organism | Publication | Epitopes | Contigs | DOI |
 | ------- | -------- | ----------- | -------- | ------: | --- |
@@ -168,15 +168,17 @@ We are continuously expanding the database. `get_reference(context = ...)` curre
 | Vaccinia | human | PMID36130603 | B5 | 150 | 10.1016/j.immuni.2022.08.019 |
 | Vaccinia | human | PMID40865529 | A35 | 8 | 10.1016/j.cell.2025.08.004 |
 | Vaccinia | human | PMID40432083 | D8 | 3 | 10.3390/vaccines13050471 |
-| Tetanus | human | GSE253857 | TT | 715 | 10.1038/s41467-024-48570-0 |
+| Tetanus | human | GSE252959 | TT | 286 | 10.1038/s41467-024-48570-0 |
+| Tetanus | human | GSE253857 | TT | 429 | 10.1038/s41467-024-48570-0 |
+| Tetanus | human | PMID35855325 | TT | 37 | 10.1093/nargab/lqac049 |
 | Measles | human | PMID42102820 | FE-1a to FE-5, HE-1a to HE-4 | 19 | 10.1016/j.chom.2026.04.010 |
 | Measles | human | PMID26187412 | - | 1 | 10.1016/j.immuni.2015.06.016 |
 | Mumps | human | PMID26187412 | - | 1 | 10.1016/j.immuni.2015.06.016 |
-| Hpylori | human | PMID12117924 | antiurease | 4 | 10.1128/IAI.70.8.4158-4164.2002 |
+| Hpylori | human | PMID12117924 | antiurease, unspecified | 4 | 10.1128/IAI.70.8.4158-4164.2002 |
 | NP | mouse | GSE154634 | NP-KLH | 3,386 | 10.1038/s41590-021-00936-y |
 | NP | mouse | GSE240813 | NP-KLH | 6,179 | 10.1038/s41590-024-01831-y |
 
-The GSE219098 entry is a reanalysis and is the only one that includes non-binding (`binding == FALSE`) contigs, which makes it useful as a negative control when benchmarking thresholds.
+Two entries include non-binding (`binding == FALSE`) contigs alongside their binders: SarsCoV2 / GSE219098 (56,147 of its 83,802 contigs) and Vaccinia / PMID40432083 (2 of 3). `find_publicBCR()` drops these automatically, but they can be retained deliberately as a negative control when benchmarking thresholds — see the Getting Started vignette. Every other entry contains binders only.
 
 ## Citation
 
