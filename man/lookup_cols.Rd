@@ -7,12 +7,12 @@
 lookup_cols(
   query,
   reference,
-  heavyCDR3,
-  heavyV = NA,
-  heavyJ = NA,
-  lightCDR3 = NA,
-  lightV = NA,
-  lightJ = NA
+  CDRH3,
+  VH = NA,
+  JH = NA,
+  CDRL3 = NA,
+  VL = NA,
+  JL = NA
 )
 }
 \arguments{
@@ -20,17 +20,17 @@ lookup_cols(
 
 \item{reference}{The reference data frame}
 
-\item{heavyCDR3}{The heavy chain CDR3 sequence}
+\item{CDRH3}{The heavy chain CDR3 sequence}
 
-\item{heavyV}{The heavy chain V gene}
+\item{VH}{The heavy chain V gene}
 
-\item{heavyJ}{The heavy chain J gene}
+\item{JH}{The heavy chain J gene}
 
-\item{lightCDR3}{The light chain CDR3 sequence}
+\item{CDRL3}{The light chain CDR3 sequence}
 
-\item{lightV}{The light chain V gene}
+\item{VL}{The light chain V gene}
 
-\item{lightJ}{The light chain J gene}
+\item{JL}{The light chain J gene}
 }
 \value{
 A list of columns to match

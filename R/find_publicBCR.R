@@ -2,12 +2,12 @@
 #' 
 #' @param query The query data frame
 #' @param reference The reference data frame
-#' @param heavyCDR3 The heavy chain CDR3 sequence
-#' @param heavyV The heavy chain V gene
-#' @param heavyJ The heavy chain J gene
-#' @param lightCDR3 The light chain CDR3 sequence
-#' @param lightV The light chain V gene
-#' @param lightJ The light chain J gene
+#' @param CDRH3 The heavy chain CDR3 sequence
+#' @param VH The heavy chain V gene
+#' @param JH The heavy chain J gene
+#' @param CDRL3 The light chain CDR3 sequence
+#' @param VL The light chain V gene
+#' @param JL The light chain J gene
 #' @param dist_method The distance method to use
 #' @param ncores The number of cores to use
 #' @param output_dir The output directory
@@ -18,19 +18,27 @@
 find_publicBCR <- function(
     query,
     reference,
-    heavyCDR3,
-    heavyV = NA,
-    heavyJ = NA,
-    lightCDR3 = NA,
-    lightV = NA,
-    lightJ = NA,
+    CDRH3,
+    VH = NA,
+    JH = NA,
+    CDRL3 = NA,
+    VL = NA,
+    JL = NA,
     dist_method = c("levenshtein", "hamming"),
     ncores = 1,
-    output_dir = NULL){
+    output_dir = NULL,
+    output_name = NULL){
 
     # Determine columns to match
     #========================================================
-    cols_to_match <- lookup_cols(query, reference, heavyCDR3, heavyV, heavyJ, lightCDR3, lightV, lightJ)
+    if("binding" %in% colnames(reference)){
+        if(all(c(TRUE, FALSE) %in% reference$binding)) {
+            message("Database contains non-binding BCRs, removing them for simplicity...")
+            reference <- reference %>% filter(binding == TRUE)}
+    }
+    
+    colnames(reference) <- paste0("ref_", colnames(reference))
+    cols_to_match <- lookup_cols(query, reference, CDRH3, VH, JH, CDRL3, VL, JL)
     
     # Run preflight checks for query and reference
     #========================================================
@@ -56,24 +64,24 @@ find_publicBCR <- function(
         output.list[[length(output.list) + 1]] <- find_min_distances(levenshtein_output)}
 
     # combine outputs
-    output <- bind_rows(output.list)
+    heavy_name <- paste0(intersect(c("VH", "JH", "CDRH3"), names(cols_to_match)), collapse = "")
+    light_name <- intersect(c("VL", "JL", "CDRL3"), names(cols_to_match))
+    if(length(light_name) > 0){
+        light_name <- paste0("_", paste0(light_name, collapse = ""))}
+    else{
+        light_name <- ""}
+    match_method <- paste0(heavy_name, light_name)
+
+    output <- bind_rows(output.list) %>%
+        mutate(
+            match_method = match_method)
 
     # write output to file
-    if(!is.null(output_dir)){
-
-        heavy_name <- names(cols_to_match)[str_detect(names(cols_to_match), "heavy")]
-        heavy_name <- rev(sort(heavy_name))
-        heavy_name <- paste0("heavy", paste0(gsub("heavy", "", heavy_name), collapse = ""))
-
-        light_name <- names(cols_to_match)[str_detect(names(cols_to_match), "light")]
-        light_name <- rev(sort(light_name))
-        if(length(light_name) > 0){
-            light_name <- paste0("_light", paste0(gsub("light", "", light_name), collapse = ""))}
-        else{
-            light_name <- ""}
-
-        filename <- paste0(output_dir, "/publicBCR_by_", heavy_name, light_name, ".csv")
+    if(!is.null(output_dir) & !is.null(output_name)){
+        filename <- paste0(output_dir, "/", output_name, ".csv")
         write.csv(output, filename, row.names = F)}
+    else{
+        message("No output directory or output name provided, skipping output to file")}
 
     # return output
     return(output)

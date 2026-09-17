@@ -4,16 +4,16 @@
 \alias{get_reference}
 \title{Get reference data frame}
 \usage{
-get_reference(antigen, epitope, org, binding = TRUE)
+get_reference(context, epitope = NULL, org = NULL, publication = NULL)
 }
 \arguments{
-\item{antigen}{The antigen to get the reference data frame for}
+\item{context}{The context to get the reference data frame for}
 
 \item{epitope}{The epitope to get the reference data frame for}
 
 \item{org}{The organism to get the reference data frame for}
 
-\item{binding}{Whether the BCR is binding to the antigen}
+\item{publication}{The publication to get the reference data frame for}
 }
 \value{
 A data frame with the reference data

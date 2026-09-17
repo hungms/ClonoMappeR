@@ -15,44 +15,216 @@ knitr:
     comment: '#>'
 ---
 
-
 ## Load the package
 ```{r}
 library(ClonoMappeR)
+library(tidyverse)
+library(ggridges)
 ```
 
-
-## Get example data
+## Get example query data
 ```{r}
-query <- read.csv("./resource/LopezDeAssis_2023.csv", row.names = 1)[1:10,]
-colnames(query)
+query_pos <- get_reference(context = "SarsCoV2", org = "human") %>%
+  filter(publication == "GSE219098" & binding == TRUE & !str_detect(name, "v1D14") & str_detect(name, "pike"))
+query_neg <- get_reference(context = "SarsCoV2", org = "human") %>%
+  filter(publication == "GSE219098" & binding == FALSE & !str_detect(name, "v1D14") & str_detect(name, "pike"))
+head(query_pos)
+head(query_neg)
 ```
 
-## Get reference BCR database
+## Get reference data
 ```{r}
-reference <- get_reference(antigen = "SarsCoV2", org = "human", epitope = "S2", binding = TRUE) %>%
-  filter(ref_publication == "LopezDeAssis_2023")
-head(reference)
+reference_pos <- get_reference(context = "SarsCoV2", org = "human") %>%
+  filter(publication == "GSE219098" & binding == TRUE & str_detect(name, "v1D14") & str_detect(name, "pike"))
+head(reference_pos)
+reference_neg <- get_reference(context = "SarsCoV2", org = "human") %>%
+  filter(publication == "GSE219098" & binding == FALSE & str_detect(name, "v1D14") & str_detect(name, "pike"))
+head(reference_neg)
 ```
 
 ## Detect BCRs with heavy chain V, J genes and CDR3
+
+### Example 1 (v2 S2+/- vs v1 S2+/-)
 ```{r}
-output <- find_publicBCR(
-  query = query,                                 # query dataframe
-  reference = reference,                         # reference dataframe
-  dist_method = c("hamming", "levenshtein"),     # CDR3 distance calculation method
-  heavyCDR3 = "junction_aa_VDJ",                 # Required; column name that stores heavyCDR3 amino acid sequence
-  heavyV = "v_call_VDJ_main",                    # Optional; column name that stores heavyCDR3
-  heavyJ = "j_call_VDJ_main",                    # Optional; column name that stores heavyCDR3
-  lightCDR3 = NA,                                # Optional; column name that stores lightCDR3 amino acid sequence
-  lightV = NA,                                   # Optional; column name that stores light chain V gene usage
-  lightJ = NA,                                   # Optional; column name that stores light chain J gene usage
-  output_dir = "test/",                          # Optional; directory to store output file
+output1_pos_vs_pos <- find_publicBCR(
+  query = query_pos,                                 # query dataframe
+  reference = reference_pos,                         # reference dataframe
+  dist_method = c("levenshtein"),     # CDR3 distance calculation method
+  CDRH3 = "CDRH3",                     # Required; column name that stores CDRH3 amino acid sequence
+  VH = "VH",                        # Optional; column name that stores heavy chain V gene usage
+  JH = "JH",                        # Optional; column name that stores heavy chain J gene usage
+  output_dir = "test/example1",                     # Optional; directory to store output file
+  output_name = "pos_vs_pos",                     # Optional; name of the output file
   ncores = 10                                    # Optional; number of cores for parallel processing
-)
+) %>%
+  mutate(type = "pos_vs_pos")
+
+output1_pos_vs_neg <- find_publicBCR(
+  query = query_pos,                                 # query dataframe
+  reference = reference_neg,                         # reference dataframe
+  dist_method = c("levenshtein"),     # CDR3 distance calculation method
+  CDRH3 = "CDRH3",                     # Required; column name that stores CDRH3 amino acid sequence
+  VH = "VH",                        # Optional; column name that stores heavy chain V gene usage
+  JH = "JH",                        # Optional; column name that stores heavy chain J gene usage
+  output_dir = "test/example1",                     # Optional; directory to store output file
+  output_name = "pos_vs_neg",                     # Optional; name of the output file
+  ncores = 10                                    # Optional; number of cores for parallel processing
+) %>%
+  mutate(type = "pos_vs_neg")
+
+
+output1_neg_vs_pos <- find_publicBCR(
+  query = query_neg,                                 # query dataframe
+  reference = reference_pos,                         # reference dataframe
+  dist_method = c("levenshtein"),     # CDR3 distance calculation method
+  CDRH3 = "CDRH3",                     # Required; column name that stores CDRH3 amino acid sequence
+  VH = "VH",                        # Optional; column name that stores heavy chain V gene usage
+  JH = "JH",                        # Optional; column name that stores heavy chain J gene usage
+  output_dir = "test/example1",                     # Optional; directory to store output file
+  output_name = "neg_vs_pos",                     # Optional; name of the output file
+  ncores = 10                                    # Optional; number of cores for parallel processing
+) %>%
+  mutate(type = "neg_vs_pos")
 ```
 
 ```{r}
-dim(output)
-output %>% select(heavyCDR3, ref_heavyCDR3, heavyCDR3_dist) %>% arrange(heavyCDR3_dist) %>% head() %>% show()
+rbind(output1_pos_vs_pos, output1_pos_vs_neg, output1_neg_vs_pos) %>%
+  ggplot(aes(x = CDRH3_dist, y = type)) +
+  geom_density_ridges(aes(fill = type), alpha = 0.5) +
+  geom_vline(xintercept = 0.1, color = "grey", linetype = "dashed") +
+  geom_vline(xintercept = 0.15, color = "red", linetype = "dashed") +
+  geom_vline(xintercept = 0.2, color = "blue", linetype = "dashed") +
+  theme_bw()
+```
+
+```{r}
+rbind(output1_pos_vs_pos, output1_pos_vs_neg, output1_neg_vs_pos) %>%
+  mutate(
+    binder = ifelse(CDRH3_dist <= 0.1, "overlap", "no overlap")
+  ) %>%
+  group_by(type, binder) %>%
+  summarise(n = n()) %>%
+  mutate(prop = n / sum(n))
+```
+
+
+## Example 2 (Plasmablast vs S2+/- at v1)
+```{r}
+query_pb <- read.csv("inst/extdata/GSE219098_Plasmablast_v1D14.csv")
+head(query_pb)
+```
+
+```{r}
+output_pb_vs_pos <- find_publicBCR(
+  query = query_pb,                                 # query dataframe
+  reference = reference_pos,                         # reference dataframe
+  dist_method = c("levenshtein"),     # CDR3 distance calculation method
+  CDRH3 = "CDRH3",                     # Required; column name that stores CDRH3 amino acid sequence
+  VH = "VH",                        # Optional; column name that stores heavy chain V gene usage
+  JH = "JH",                        # Optional; column name that stores heavy chain J gene usage
+  CDRL3 = "CDRL3",                                    # Optional; column name that stores CDRL3 amino acid sequence
+  VL = "VL",                                       # Optional; column name that stores light chain V gene usage
+  JL = "JL",                                       # Optional; column name that stores light chain J gene usage
+  output_dir = "test/example2",                     # Optional; directory to store output file
+  output_name = "pb_vs_pos",                     # Optional; name of the output file
+  ncores = 10                                    # Optional; number of cores for parallel processing
+) %>%
+  mutate(type = "pb_vs_pos")
+
+output_pb_vs_neg <- find_publicBCR(
+  query = query_pb,                                 # query dataframe
+  reference = reference_neg,                         # reference dataframe
+  dist_method = c("levenshtein"),     # CDR3 distance calculation method
+  CDRH3 = "CDRH3",                     # Required; column name that stores CDRH3 amino acid sequence
+  VH = "VH",                        # Optional; column name that stores heavy chain V gene usage
+  JH = "JH",                        # Optional; column name that stores heavy chain J gene usage
+  CDRL3 = "CDRL3",                                    # Optional; column name that stores CDRL3 amino acid sequence
+  VL = "VL",                                       # Optional; column name that stores light chain V gene usage
+  JL = "JL",                                       # Optional; column name that stores light chain J gene usage
+  output_dir = "test/example2",                     # Optional; directory to store output file
+  output_name = "pb_vs_neg",                     # Optional; name of the output file
+  ncores = 10                                    # Optional; number of cores for parallel processing
+) %>%
+  mutate(type = "pb_vs_neg")
+```
+
+```{r}
+rbind(output_pb_vs_pos, output_pb_vs_neg) %>%
+  ggplot(aes(x = CDRH3_dist, y = type)) +
+  geom_density_ridges(aes(fill = type), alpha = 0.5) +
+  geom_vline(xintercept = 0.1, color = "grey", linetype = "dashed") +
+  geom_vline(xintercept = 0.15, color = "red", linetype = "dashed") +
+  geom_vline(xintercept = 0.2, color = "blue", linetype = "dashed") +
+  theme_bw()
+```
+
+```{r}
+rbind(output_pb_vs_pos, output_pb_vs_neg) %>%
+  mutate(
+    binder = ifelse(CDRH3_dist <= 0.1, "overlap", "no overlap")
+  ) %>%
+  group_by(type, binder) %>%
+  summarise(n = n()) %>%
+  mutate(prop = n / sum(n))
+```
+
+## Example 3 (Plasmablast vs S2+/- total)
+```{r}
+reference <- get_reference(context = "SarsCoV2", org = "human") %>%
+  filter(publication == "GSE219098" & binding == TRUE)
+head(reference)
+```
+
+```{r}
+output3_pb_vs_pos <- find_publicBCR(
+  query = query_pb,                                 # query dataframe
+  reference = reference,                         # reference dataframe
+  dist_method = c("levenshtein"),     # CDR3 distance calculation method
+  CDRH3 = "CDRH3",                     # Required; column name that stores CDRH3 amino acid sequence
+  VH = "VH",                        # Optional; column name that stores heavy chain V gene usage
+  JH = "JH",                        # Optional; column name that stores heavy chain J gene usage
+  CDRL3 = NA,                                    # Optional; column name that stores CDRL3 amino acid sequence
+  VL = NA,                                       # Optional; column name that stores light chain V gene usage
+  JL = NA,                                       # Optional; column name that stores light chain J gene usage
+  output_dir = "test/example3",                  # Optional; directory to store output file
+  output_name = "pb_vs_pos",                     # Optional; name of the output file
+  ncores = 10                                    # Optional; number of cores for parallel processing
+) %>%
+  mutate(type = "pb_vs_pos")
+
+output3_pb_vs_neg <- find_publicBCR(
+  query = query_pb,                                 # query dataframe
+  reference = reference_neg,                         # reference dataframe
+  dist_method = c("levenshtein"),     # CDR3 distance calculation method
+  CDRH3 = "CDRH3",                     # Required; column name that stores CDRH3 amino acid sequence
+  VH = "VH",                        # Optional; column name that stores heavy chain V gene usage
+  JH = "JH",                        # Optional; column name that stores heavy chain J gene usage
+  CDRL3 = NA,                                    # Optional; column name that stores CDRL3 amino acid sequence
+  VL = NA,                                       # Optional; column name that stores light chain V gene usage
+  JL = NA,                                       # Optional; column name that stores light chain J gene usage
+  output_dir = "test/example3",                  # Optional; directory to store output file
+  output_name = "pb_vs_neg",                     # Optional; name of the output file
+  ncores = 10                                    # Optional; number of cores for parallel processing
+) %>%
+  mutate(type = "pb_vs_neg")
+```
+
+```{r}
+rbind(output3_pb_vs_pos, output3_pb_vs_neg) %>%
+  ggplot(aes(x = CDRH3_dist, y = type)) +
+  geom_density_ridges(aes(fill = type), alpha = 0.5) +
+  geom_vline(xintercept = 0.1, color = "grey", linetype = "dashed") +
+  geom_vline(xintercept = 0.15, color = "red", linetype = "dashed") +
+  geom_vline(xintercept = 0.2, color = "blue", linetype = "dashed") +
+  theme_bw()
+```
+
+```{r}
+rbind(output3_pb_vs_pos, output3_pb_vs_neg) %>%
+  mutate(
+    binder = ifelse(CDRH3_dist <= 0.1, "overlap", "no overlap")
+  ) %>%
+  group_by(type, binder) %>%
+  summarise(n = n()) %>%
+  mutate(prop = n / sum(n))
 ```

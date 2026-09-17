@@ -33,8 +33,8 @@ preflight_query <- function(query, cols_to_match){
     nrow_query <- nrow(query)
 
     # get CDR3 and gene columns to match
-    cdr3_to_match <- cols_to_match[str_detect(names(cols_to_match), "CDR3")]
-    genes_to_match <- cols_to_match[!str_detect(names(cols_to_match), "CDR3")]
+    cdr3_to_match <- cols_to_match[str_detect(names(cols_to_match), "CDR[HL]3")]
+    genes_to_match <- cols_to_match[!str_detect(names(cols_to_match), "CDR[HL]3")]
 
     # FOR CDR3 COLUMNS
     #========================================================
@@ -111,10 +111,10 @@ preflight_reference <- function(reference, cols_to_match){
     nrow_reference <- nrow(reference)
 
     # get CDR3 and gene columns to match
-    cdr3_to_match <- cols_to_match[str_detect(names(cols_to_match), "CDR3")]
+    cdr3_to_match <- cols_to_match[str_detect(names(cols_to_match), "CDR[HL]3")]
     names(cdr3_to_match) <- paste0("ref_", names(cdr3_to_match))
 
-    genes_to_match <- cols_to_match[!str_detect(names(cols_to_match), "CDR3")]
+    genes_to_match <- cols_to_match[!str_detect(names(cols_to_match), "CDR[HL]3")]
     if(length(genes_to_match) > 0){
         names(genes_to_match) <- paste0("ref_", names(genes_to_match))}
 

@@ -15,8 +15,8 @@ find_hamming_dist <- function(query, reference, cols_to_match, ncores){
     future::plan(future::multisession, workers = ncores)
 
     # get CDR3 and gene columns to match
-    cdr3_to_match <- cols_to_match[str_detect(names(cols_to_match), "CDR3")]
-    genes_to_match <- cols_to_match[!str_detect(names(cols_to_match), "CDR3")]
+    cdr3_to_match <- cols_to_match[str_detect(names(cols_to_match), "CDR[HL]3")]
+    genes_to_match <- cols_to_match[!str_detect(names(cols_to_match), "CDR[HL]3")]
 
     # Pre-filter query by gene matching if needed
     if(length(genes_to_match) > 0){
@@ -100,8 +100,8 @@ find_levenshtein_dist <- function(query, reference, cols_to_match, ncores){
     future::plan(future::multisession, workers = ncores)
 
     # get CDR3 and gene columns to match
-    cdr3_to_match <- cols_to_match[str_detect(names(cols_to_match), "CDR3")]
-    genes_to_match <- cols_to_match[!str_detect(names(cols_to_match), "CDR3")]
+    cdr3_to_match <- cols_to_match[str_detect(names(cols_to_match), "CDR[HL]3")]
+    genes_to_match <- cols_to_match[!str_detect(names(cols_to_match), "CDR[HL]3")]
 
 
     # Pre-filter query by gene matching if needed
@@ -177,11 +177,11 @@ find_min_distances <- function(output){
 
     message(paste0("Finding minimum CDR3 distance for each barcode..."))
     
-    # remove rows with NA in ref_heavyCDR3
-    output <- output[!is.na(ref_heavyCDR3)]
+    # remove rows with NA in ref_CDRH3
+    output <- output[!is.na(ref_CDRH3)]
 
     # filter for rows where all dist_method values are the same
-    dist_cols <- colnames(output)[str_detect(colnames(output), "CDR3_dist$")]
+    dist_cols <- colnames(output)[str_detect(colnames(output), "CDR[HL]3_dist$")]
     
     # check if there are any matching sequences
     if(nrow(output) > 0){
@@ -193,7 +193,7 @@ find_min_distances <- function(output){
         output <- output[output[, .I[which.min(mean_dist)], by = barcodes]$V1]
 
         # found matching BCR sequences
-        n_methods <- length(unique(output$heavyCDR3_dist_method))
+        n_methods <- length(unique(output$CDRH3_dist_method))
         message(paste0("Found ", nrow(output)/n_methods, " public BCR sequences in QUERY..."))
 
         # return output

@@ -1,123 +1,188 @@
-## ClonoMappeR
-An R package to map BCR seuqences to detect public antigen-specific B-cell clones.
+# ClonoMappeR
 
-`Public Clones` = Clones containing BCR sequence matching our antigen-binding BCR database  
+An R package to map BCR sequences against public, antigen-specific B-cell clone databases.
+
+Given a set of query BCR contigs (e.g. from single-cell VDJ sequencing), ClonoMappeR finds the closest known antigen-specific clone for each cell by matching V/J gene usage and measuring CDR3 amino acid sequence similarity. You can then apply a distance threshold to call cells as antigen-specific.
+
+Documentation: <https://hungms.github.io/ClonoMappeR/>
 
 ## Installation
-```{r}
+
+```r
 install.packages("devtools")
-devtools::install_github("hungms/ClonoMappeR", dependencies = T)
+devtools::install_github("hungms/ClonoMappeR")
 ```
 
 ## Overview
-The package consist 3 main functions :  
 
-`get_reference()` allows users to request a reference database of BCR contigs specific for the antigen of interest.
+The package has two main functions.
 
-`find_publicBCR()` allows users to
-* Select query BCR contigs with matching heavy/light chain VJ gene usage with reference BCR contigs.
-* Determine how similar each query CDR3 amino acid (AA) sequence is to all antigen-specific CDR3 AA sequences.
+`get_reference()` retrieves a curated reference database of antigen-specific BCR contigs for a given context (e.g. Sars-CoV-2), optionally filtered by organism, publication and epitope.
 
-## Running the pipeline
-### Determining Public Clones
-In this tutorial we will demonstrate how we can determine **public Sars-CoV-2 specific BCR sequences** from the example data in the package. Here we will load the example QUERY data included in the package, which contain single-cell BCR sequences from plasma cells after Sars-CoV-2 mRNA-1273 vaccine. 
+`find_publicBCR()` matches a query dataset against a reference. It selects query contigs whose heavy/light chain V and J genes match a reference contig, then computes how similar each query CDR3 amino acid sequence is to the reference CDR3 sequences, and reports the closest match per cell.
 
-Each row of the data should represent a cell / unique pair of BCR sequence. The data **must** contain a column for heavy chain CDR3 AA sequence, and optionally other columns containing information about V gene, J gene, CDR3 AA sequence for heavy/light chain.
+## Quick start
 
-```{r}
-# get example query data
-path <- system.file("extdata", "dandelion_metadata.csv", package = "ClonoMappeR")
-query <- read.csv(path, row.names = 1)[1:10,] # reduce data for run time
-head(query)
-```
+```r
+library(ClonoMappeR)
+library(dplyr)
 
-Here we will retrieve known Sar-CoV-2 specific sequences from our reference database. Users can supply their own custom database by renaming the colnames.
-```{r}
-# get reference Sars-CoV2 BCR database
-reference <- get_reference(antigen = "SarsCoV2", epitope = "S2", binding = TRUE, org = "human")
-head(reference)
-```
+# Example query: plasma cell BCRs after Sars-CoV-2 mRNA-1273 vaccination
+path  <- system.file("extdata", "GSE219098_Plasmablast_v1D14.csv", package = "ClonoMappeR")
+query <- read.csv(path, row.names = 2)   # row names are the cell barcodes
 
-Below we will match the query BCR sequences with the Sars-CoV reference BCR sequences. The `find_publicBCR()` function carrys out the following subprocesses in order:  
+# Reference: known Sars-CoV-2 S2-specific BCRs
+reference <- get_reference(context = "SarsCoV2", org = "human", epitope = "S2")
 
-1. Remove invalid VJ gene and CDR3 sequences (<5 AA) from query and reference dataframe
-2. Keep sequences if the combination of VJ gene is present in both query and reference dataframe (optional)
-3. Calculate CDR3 AA hamming/levenshtein distance for each pair of query and reference seqeunce (± of the same VJ gene, optional)
-4. Determine which sequence pair has the **minimum** CDR3 distance for each query sequence
-
-Here we will find public clones by comparing heavy chain CDR3 sequence, in addition to matching V and J genes for the heavy chain, by specifying the `heavyCDR3`, `heavyV` and `heavyJ` arguments.
-
-```{r}
-# run find_publicBCR
 output <- find_publicBCR(
-  query = query,                                 # query dataframe
-  reference = reference,                         # reference dataframe
-  dist_method = c("hamming", "levenshtein"),     # CDR3 distance calculation method
-  heavyCDR3 = "junction_aa_VDJ",                 # Required; query column name that stores heavyCDR3 amino acid sequence
-  heavyV = "v_vall_VDJ_main",                    # Optional; query column name that stores heavyCDR3
-  heavyJ = "j_call_VDJ_main",                    # Optional; query column name that stores heavyCDR3
-  # lightCDR3 = NA,                                # Optional; query column name that stores lightCDR3 amino acid sequence
-  # lightV = NA,                                   # Optional; query column name that stores light chain V gene usage
-  # lightJ = NA,                                   # Optional; query column name that stores light chain J gene usage
-  # output_dir = NULL,                             # Optional; directory to store output file
-  # ncores = 1                                     # Optional; number of cores for parallel processing
+  query       = query,
+  reference   = reference,
+  CDRH3       = "CDRH3",   # required: query column holding the CDRH3 AA sequence
+  VH          = "VH",      # optional: query column holding the heavy chain V gene
+  JH          = "JH",      # optional: query column holding the heavy chain J gene
+  dist_method = "levenshtein"
+)
+
+# Call antigen-specific cells
+ag_specific <- output %>% filter(CDRH3_dist < 0.1)
+```
+
+## Input format
+
+### Query
+
+The query is a `data.frame` or `data.table` where **each row is one cell, or one unique heavy/light chain pair**. Row names are used as cell identifiers and are returned in the output as the `barcodes` column; if the query has no meaningful row names, rows are numbered `1:N` instead.
+
+Query columns can be named anything you like — you tell `find_publicBCR()` which column is which via its arguments:
+
+| Argument | Required | Contents |
+| -------- | -------- | -------- |
+| `CDRH3`  | Yes      | Heavy chain CDR3 amino acid sequence |
+| `VH`     | No       | Heavy chain V gene |
+| `JH`     | No       | Heavy chain J gene |
+| `CDRL3`  | No       | Light chain CDR3 amino acid sequence |
+| `VL`     | No       | Light chain V gene |
+| `JL`     | No       | Light chain J gene |
+
+Any argument left as `NA` (the default) is excluded from matching. Columns not referenced by an argument are dropped before matching and do not appear in the output, so keep your own metadata in a separate table and re-join it on `barcodes` afterwards.
+
+### Reference
+
+The reference is also a `data.frame` or `data.table`, one contig per row. Unlike the query, **its columns must use the canonical names below** — `find_publicBCR()` internally prefixes every reference column with `ref_` and looks for `ref_CDRH3`, `ref_VH`, and so on. Do not add the `ref_` prefix yourself.
+
+Sequence columns (these must exist for whichever chains you are matching on):
+
+| Column  | Required | Contents |
+| ------- | -------- | -------- |
+| `CDRH3` | Yes      | Heavy chain CDR3 amino acid sequence |
+| `VH`    | Only if `VH` is set in the call | Heavy chain V gene |
+| `JH`    | Only if `JH` is set in the call | Heavy chain J gene |
+| `CDRL3` | Only if `CDRL3` is set in the call | Light chain CDR3 amino acid sequence |
+| `VL`    | Only if `VL` is set in the call | Light chain V gene |
+| `JL`    | Only if `JL` is set in the call | Light chain J gene |
+
+Metadata columns are all optional. They are carried through to the output with a `ref_` prefix so you can trace which reference contig a query cell matched. The bundled databases use:
+
+| Column | Contents |
+| ------ | -------- |
+| `context` | Antigen context, e.g. `SarsCoV2` |
+| `strain` | Strain or variant the contig was tested against, e.g. `SARS-CoV2_WT`. Multiple values are separated by `;` |
+| `epitope` | Epitope or antigen sub-domain, e.g. `S2`, `RBD` |
+| `org` | `human` or `mouse` |
+| `publication` | Source accession or PMID, e.g. `GSE219098` |
+| `name` | Contig or clone identifier from the source study |
+| `binding` | Logical; whether the contig binds the antigen |
+
+`binding` is the one metadata column that changes behaviour: if the reference contains both `TRUE` and `FALSE` values, non-binders are dropped automatically so that only true binders are used as the reference. A reference with no `binding` column, or with only one value, is used as-is.
+
+A minimal custom reference therefore looks like:
+
+```r
+reference <- data.frame(
+  VH    = c("IGHV4-59", "IGHV3-66"),
+  JH    = c("IGHJ5",    "IGHJ3"),
+  CDRH3 = c("CAKGIYSSSSYWFGPW", "CARDHSGHALDIW"),
+  name  = c("clone_1", "clone_2")
 )
 ```
 
-Abbreviations :
-  
-* `heavyCDR3` = Heavy chain CDR3 amino acid sequence  
-* `heavyV` = Heavy chain V gene  
-* `heavyJ` = Heavy chain J gene  
-* `lightCDR3` = Light chain CDR3 amino acid sequence  
-* `lightV` = Light chain V gene  
-* `lightJ` = Light chain J gene  
+### Validation rules
 
+Both query and reference pass through the same checks before matching, and rows failing any of them are silently dropped (the counts removed are reported in the console):
 
-## Setting distance threshold to define antigen-specificity
-Running the pipeline should return a dataframe of query contigs matching with the closest antigen-specifc contigs. The dataframe should contain columns as follows :  
+* **CDR3 sequences** must be uppercase amino acid letters only and at least 5 residues long. Sequences containing `*`, `_`, lowercase letters, digits or gaps are removed, as are `NA`, `""`, `"NA"` and `"None"`. The bundled databases use IMGT junction sequences including the leading `C` and trailing `W`/`F`, e.g. `CARDHSGHALDIW`.
+* **V and J genes** must start with `IGH`, `IGK` or `IGL`, e.g. `IGHV4-59`, `IGHJ5`, `IGKV1-9`, `IGLJ3`.
+* Gene matching is an **exact string comparison**, so query and reference must use the same nomenclature. In particular, strip allele suffixes (`IGHV4-59*01` will not match `IGHV4-59`) and make sure ambiguous calls are formatted consistently.
 
-* `ref_*` = metadata from reference database  
-* `dist_method` = method used to calculate CDR3 distance, either hamming or levenshtein
-* `dist` = CDR3 distance ranging from 0 to 1. `0` means the CDR3 is an exact match with the reference sequence  
-* `mean_dist` = mean CDR3 distance ranging from 0 to 1 by averaging `dist` when both `heavyCDR3` and `lightCDR3` distances are calculated.  
+## How matching works
 
-```{r}
-head(output)
-```
+`find_publicBCR()` runs the following steps in order:
 
-Users can define "antigen-specificity" base on their choice of method and threshold. Typically, we recommend to set the minimum levenshtein distance to be **at least less than 0.1** (see [jupyter notebook regarding threshold benchmarking](vignettes/threshold_benchmarking.ipynb)). 
-```{r}
+1. Drop invalid V/J genes and CDR3 sequences (< 5 AA) from both the query and the reference.
+2. Keep only rows whose V/J gene combination is present in *both* the query and the reference (skipped if no gene arguments are supplied).
+3. Compute the CDR3 amino acid distance for every remaining query–reference pair. Hamming distance only compares sequences of equal length and is normalised by the reference CDR3 length; Levenshtein distance handles unequal lengths and is normalised by the longer of the two sequences. Both therefore range from 0 to 1.
+4. For each query cell, keep the single reference contig with the **minimum** distance — the CDRH3 distance when matching on heavy chain only, or the mean of the CDRH3 and CDRL3 distances when matching on both.
+
+Setting `dist_method = c("hamming", "levenshtein")` runs both and returns one row per cell per method. Use `ncores` to parallelise, and `output_dir` plus `output_name` to write the result to CSV.
+
+## Output format
+
+The result is a `data.table` with one row per matched query cell per distance method:
+
+| Column | Description |
+| ------ | ----------- |
+| `barcodes` | Query cell identifier, taken from the query row names |
+| `VH`, `JH`, `CDRH3`, ... | The matched query columns, renamed to their canonical names |
+| `CDRH3_length`, `CDRL3_length` | CDR3 lengths in amino acids |
+| `ref_*` | All columns of the matched reference contig, including its metadata |
+| `CDRH3_dist_method`, `CDRL3_dist_method` | `hamming` or `levenshtein` |
+| `CDRH3_dist`, `CDRL3_dist` | Normalised CDR3 distance from 0 to 1. `0` is an exact match to the reference sequence |
+| `mean_dist` | Mean of the per-chain distances; equals `CDRH3_dist` when only the heavy chain is used |
+| `match_method` | Which fields were used for matching, e.g. `VHJHCDRH3` or `VHJHCDRH3_VLJLCDRL3` |
+
+Cells with no reference match at all are absent from the output. The output also carries two internal helper columns, `gene_key` and `rn`, which can safely be ignored or dropped.
+
+## Setting a distance threshold
+
+There is no universal cut-off — how strict to be depends on your antigen, depth of sequencing and tolerance for false positives. As a starting point we recommend a minimum Levenshtein distance of **less than 0.1**. See the [Getting Started vignette](https://hungms.github.io/ClonoMappeR/articles/ClonoMappeR.html), which benchmarks thresholds by comparing known antigen-positive against antigen-negative sorted cells.
+
+```r
 ag_specific_bcr <- output %>%
-  filter(dist_method == "levenshtein") %>%
-  filter(dist < 0.1)
+  filter(CDRH3_dist_method == "levenshtein") %>%
+  filter(CDRH3_dist < 0.1)
 
-head(ag_specific_bcr)
-dim(ag_specific_bcr)
+nrow(ag_specific_bcr)
 ```
 
-## Reference Database Collection
-We are working to expand our database continuously. In our current version, the collection contains public BCR sequences for following antigens : 
-* `Sars-CoV-2` 
-* `Vaccinia`
-* `Tetanus` - TBC
-* `Measles` - TBC
-* `Mumps` - TBC
+## Reference database collection
 
-```
-| VERSION | ANTIGEN    | DATABASE           | REANALYSIS |  NOTE | DOI  |
-| ------- | ---------- | ------------------ | ---------- | ---- | ---- |
-| v0.0.0  | Sars-CoV-2 | CoV-AbDab          | N          |      | 10.1093/bioinformatics/btaa739 |
-| v0.0.0  | Vaccinia   | Chappert_2022      | Y          | B5+  | 10.1016/j.immuni.2022.08.019   |
-| v0.0.1  | Sars-CoV-2 | LopezDeAssis_2023  | Y          | S2P+ | 10.1016/j.celrep.2023.112780   |
-| v0.0.1  | Sars-CoV-2 | FerreiraGomez_2024 | Y          | TBC  | 10.1038/s41467-024-48570-0     |
-| v0.0.1  | Tetanus    | FerreiraGomez_2024 | Y          | TBC  | 10.1038/s41467-024-48570-0     |    
-| v0.0.1  | Measles    |                    |            |      | 
+We are continuously expanding the database. `get_reference(context = ...)` currently accepts `SarsCoV2`, `Vaccinia`, `Tetanus`, `Measles`, `Mumps`, `Hpylori` and `NP`, and can be narrowed further with the `org`, `publication` and `epitope` arguments.
+
+| Context | Organism | Publication | Epitopes | Contigs | DOI |
+| ------- | -------- | ----------- | -------- | ------: | --- |
+| SarsCoV2 | human | PMID32805021 | N, NTD, RBD, S, S1, S2 | 8,227 | 10.1093/bioinformatics/btaa739 |
+| SarsCoV2 | mouse | PMID32805021 | M, N, NTD, RBD, S, S1, S2 | 270 | 10.1093/bioinformatics/btaa739 |
+| SarsCoV2 | human | GSE219098 | S2 | 83,802 | 10.1016/j.celrep.2023.112780 |
+| SarsCoV2 | human | GSE252959 | S | 524 | 10.1038/s41467-024-48570-0 |
+| SarsCoV2 | human | GSE253857 | S | 602 | 10.1038/s41467-024-48570-0 |
+| Vaccinia | human | PMID36130603 | B5 | 150 | 10.1016/j.immuni.2022.08.019 |
+| Vaccinia | human | PMID40865529 | A35 | 8 | 10.1016/j.cell.2025.08.004 |
+| Vaccinia | human | PMID40432083 | D8 | 3 | 10.3390/vaccines13050471 |
+| Tetanus | human | GSE253857 | TT | 715 | 10.1038/s41467-024-48570-0 |
+| Measles | human | PMID42102820 | FE-1a to FE-5, HE-1a to HE-4 | 19 | 10.1016/j.chom.2026.04.010 |
+| Measles | human | PMID26187412 | - | 1 | 10.1016/j.immuni.2015.06.016 |
+| Mumps | human | PMID26187412 | - | 1 | 10.1016/j.immuni.2015.06.016 |
+| Hpylori | human | PMID12117924 | antiurease | 4 | 10.1128/IAI.70.8.4158-4164.2002 |
+| NP | mouse | GSE154634 | NP-KLH | 3,386 | 10.1038/s41590-021-00936-y |
+| NP | mouse | GSE240813 | NP-KLH | 6,179 | 10.1038/s41590-024-01831-y |
+
+The GSE219098 entry is a reanalysis and is the only one that includes non-binding (`binding == FALSE`) contigs, which makes it useful as a negative control when benchmarking thresholds.
 
 ## Citation
-Codes were inspired from previous publication in Cell Reports :
 
-```
+Code was inspired by the following publication in Cell Reports:
+
+```bibtex
 @article{LOPESDEASSIS2023112780,
 title = {Tracking B cell responses to the SARS-CoV-2 mRNA-1273 vaccine},
 journal = {Cell Reports},
@@ -129,8 +194,6 @@ issn = {2211-1247},
 doi = {https://doi.org/10.1016/j.celrep.2023.112780},
 url = {https://www.sciencedirect.com/science/article/pii/S221112472300791X},
 author = {Felipe {Lopes de Assis} and Kenneth B. Hoehn and Xiaozhen Zhang and Lela Kardava and Connor D. Smith and Omar {El Merhebi} and Clarisa M. Buckner and Krittin Trihemasava and Wei Wang and Catherine A. Seamon and Vicky Chen and Paul Schaughency and Foo Cheung and Andrew J. Martins and Chi-I Chiang and Yuxing Li and John S. Tsang and Tae-Wook Chun and Steven H. Kleinstein and Susan Moir},
-keywords = {SARS-CoV-2, mRNA vaccine, B cells, immunological memory, single-cell profiling, BCR repertoire},
-abstract = {Summary
-Protective immunity following vaccination is sustained by long-lived antibody-secreting cells and resting memory B cells (MBCs). Responses to two-dose SARS-CoV-2 mRNA-1273 vaccination are evaluated longitudinally by multimodal single-cell analysis in three infection-naïve individuals. Integrated surface protein, transcriptomics, and B cell receptor (BCR) repertoire analysis of sorted plasmablasts and spike+ (S-2P+) and S-2P− B cells reveal clonal expansion and accumulating mutations among S-2P+ cells. These cells are enriched in a cluster of immunoglobulin G-expressing MBCs and evolve along a bifurcated trajectory rooted in CXCR3+ MBCs. One branch leads to CD11c+ atypical MBCs while the other develops from CD71+ activated precursors to resting MBCs, the dominant population at month 6. Among 12 evolving S-2P+ clones, several are populated with plasmablasts at early timepoints as well as CD71+ activated and resting MBCs at later timepoints, and display intra- and/or inter-cohort BCR convergence. These relationships suggest a coordinated and predictable evolution of SARS-CoV-2 vaccine-generated MBCs.}
+keywords = {SARS-CoV-2, mRNA vaccine, B cells, immunological memory, single-cell profiling, BCR repertoire}
 }
 ```
