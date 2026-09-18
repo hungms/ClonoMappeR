@@ -11,7 +11,7 @@
 get_reference <- function(context, epitope = NULL, org = NULL, publication = NULL){
 
     # check context is valid
-    stopifnot(context %in% c("SarsCoV2", "Tetanus", "Vaccinia", "Measles", "Mumps", "Hpylori", "NP"))
+    stopifnot(context %in% c("SarsCoV2", "Tetanus", "Vaccinia", "Measles", "Mumps", "Hpylori", "NP", "hERV"))
 
     # read reference data
     reference <- read.csv(system.file("extdata", paste0(context, ".csv"), package = "ClonoMappeR"), header = T, sep = ",")

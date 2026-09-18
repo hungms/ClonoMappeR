@@ -41,9 +41,13 @@ find_publicBCR(
 \item{ncores}{The number of cores to use}
 
 \item{output_dir}{The output directory}
+
+\item{output_name}{The output filename, without the .csv extension}
 }
 \value{
-A data frame with the matched CDR3 sequences
+A data frame with the matched CDR3 sequences. Query barcodes with no
+reference match are included as rows holding only a barcode, with NA in
+every other column.
 }
 \description{
 Detect Public BCR Sequences

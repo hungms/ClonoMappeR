@@ -140,7 +140,12 @@ The result is a `data.table` with one row per matched query cell per distance me
 | `mean_dist` | Mean of the per-chain distances; equals `CDRH3_dist` when only the heavy chain is used |
 | `match_method` | Which fields were used for matching, e.g. `VHJHCDRH3` or `VHJHCDRH3_VLJLCDRL3` |
 
-Cells with no reference match at all are absent from the output. The output also carries two internal helper columns, `gene_key` and `rn`, which can safely be ignored or dropped.
+Every barcode from the query appears in the output, so the result can be joined straight back onto your own metadata. Cells with no reference match are returned as a row carrying only the `barcodes` value, with `NA` in every other column — including `CDRH3_dist_method`, so filtering on a distance method will exclude them. To keep them, filter on the distance instead, or test for `NA` explicitly:
+```r
+output %>% filter(is.na(CDRH3_dist) | CDRH3_dist < 0.1)
+```
+The output also carries two internal helper columns, `gene_key` and `rn`, which can safely be ignored or dropped.
+
 
 ## Setting a distance threshold
 

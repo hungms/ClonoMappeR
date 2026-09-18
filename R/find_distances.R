@@ -176,7 +176,12 @@ find_levenshtein_dist <- function(query, reference, cols_to_match, ncores){
 find_min_distances <- function(output){
 
     message(paste0("Finding minimum CDR3 distance for each barcode..."))
-    
+
+    # no candidate pairs survived gene matching, so there is nothing to rank
+    if(nrow(output) == 0 | !"ref_CDRH3" %in% colnames(output)){
+        warning("\nNo public BCR sequences found")
+        return(data.table())}
+
     # remove rows with NA in ref_CDRH3
     output <- output[!is.na(ref_CDRH3)]
 

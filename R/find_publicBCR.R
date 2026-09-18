@@ -11,7 +11,10 @@
 #' @param dist_method The distance method to use
 #' @param ncores The number of cores to use
 #' @param output_dir The output directory
-#' @return A data frame with the matched CDR3 sequences
+#' @param output_name The output filename, without the .csv extension
+#' @return A data frame with the matched CDR3 sequences. Query barcodes with no
+#'   reference match are included as rows holding only a barcode, with NA in
+#'   every other column.
 #' @import dplyr stringr magrittr data.table
 #' @export
 
@@ -39,7 +42,16 @@ find_publicBCR <- function(
     
     colnames(reference) <- paste0("ref_", colnames(reference))
     cols_to_match <- lookup_cols(query, reference, CDRH3, VH, JH, CDRL3, VL, JL)
-    
+
+    # Record every query barcode before filtering, mirroring how preflight_query assigns them
+    #========================================================
+    if(is.data.table(query)){
+        all_barcodes <- if("rn" %in% colnames(query)){
+            as.character(query$rn)} else {
+            as.character(seq_len(nrow(query)))}}
+    else{
+        all_barcodes <- rownames(query)}
+
     # Run preflight checks for query and reference
     #========================================================
     preflight_checks(ncores, dist_method, output_dir)
@@ -75,6 +87,13 @@ find_publicBCR <- function(
     output <- bind_rows(output.list) %>%
         mutate(
             match_method = match_method)
+
+    # Add back query barcodes with no reference match, leaving every other column as NA
+    #========================================================
+    unmatched_barcodes <- setdiff(all_barcodes, unique(output$barcodes))
+    if(length(unmatched_barcodes) > 0){
+        message(paste0("Adding ", length(unmatched_barcodes), " QUERY barcodes without a reference match..."))
+        output <- bind_rows(output, data.table(barcodes = unmatched_barcodes))}
 
     # write output to file
     if(!is.null(output_dir) & !is.null(output_name)){
