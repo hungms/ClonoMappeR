@@ -161,7 +161,7 @@ nrow(ag_specific_bcr)
 
 ## Reference database collection
 
-We are continuously expanding the database, which currently holds 103,928 contigs across seven antigen contexts. `get_reference(context = ...)` accepts `SarsCoV2`, `Vaccinia`, `Tetanus`, `Measles`, `Mumps`, `Hpylori` and `NP`, and can be narrowed further with the `org`, `publication` and `epitope` arguments.
+We are continuously expanding the database, which currently holds 103,928 contigs across seven antigen contexts. `get_reference(context = ...)` accepts `SarsCoV2`, `Vaccinia`, `Tetanus`, `Measles`, `Mumps`, `Hpylori`, `NP`, `SRBC` and `Microbiota`, and can be narrowed further with the `org`, `publication` and `epitope` arguments.
 
 | Context | Organism | Publication | Epitopes | Contigs | DOI |
 | ------- | -------- | ----------- | -------- | ------: | --- |
@@ -184,6 +184,7 @@ We are continuously expanding the database, which currently holds 103,928 contig
 | NP | mouse | GSE154634 | NP-KLH | 3,386 | 10.1038/s41590-021-00936-y |
 | NP | mouse | GSE240813 | NP-KLH | 6,179 | 10.1038/s41590-024-01831-y |
 | SRBC | mouse | SC22169, SC24124 | SRBC | 2,802 | Tony Chen, total hCD2+ B cells |
+| Microbiota | mouse | PMID28971969 | DNA, Influenza | 36 | 10.1126/science.aan6619 |
 
 Two entries include non-binding (`binding == FALSE`) contigs alongside their binders: SarsCoV2 / GSE219098 (56,147 of its 83,802 contigs) and Vaccinia / PMID40432083 (2 of 3). `find_publicBCR()` drops these automatically, but they can be retained deliberately as a negative control when benchmarking thresholds — see the Getting Started vignette. Every other entry contains binders only.
 
